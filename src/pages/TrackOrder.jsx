@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
 import { formatDate, formatDateTime } from '../lib/utils'
@@ -55,63 +55,43 @@ export default function TrackOrder() {
   const [loading, setLoading] = useState(true)
   const [ratingOrder, setRatingOrder] = useState(null)
 
+  // Keep local order list in sync with realtime updates from NotificationContext.
+  // The popup + sound is handled globally by NotificationContext — no duplicate
+  // channel needed here. We only subscribe to keep the progress bar live.
   useEffect(() => {
     if (!user) return
+
     fetchOrders()
 
-    // Unlock audio for this page (required by browser before playing sounds)
-    const unlockHandler = () => { unlockAudio(); document.removeEventListener('click', unlockHandler) }
-    document.addEventListener('click', unlockHandler)
-
-    const channel = supabase.channel('track_orders_' + user.id)
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'orders', filter: `user_id=eq.${user.id}` }, payload => {
-        const prevStatus = orderStatusRef.current[payload.new.id]
-        const newStatus = payload.new.status
-        // Always show popup + sound when status changes
-        if (newStatus && prevStatus !== newStatus) {
-          playNotificationSound('user')
-          const label = newStatus.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
-          // Browser push notification (works even if tab is in background)
-          sendPushNotification(
-            `Order #${payload.new.order_id}: ${label}`,
-            newStatus === 'out_for_delivery' ? 'Your order is on the way! 🛵' :
-            newStatus === 'delivered' ? 'Your order has been delivered! 😋' :
-            newStatus === 'preparing' ? "We're preparing your order! 👨‍🍳" : ''
+    const channel = supabase
+      .channel('trackorder_ui_sync_' + user.id)
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'orders', filter: `user_id=eq.${user.id}` },
+        payload => {
+          // Just update the local list so the progress bar moves — no popup/sound here
+          setOrders(prev =>
+            prev.map(o => o.id === payload.new.id ? { ...o, ...payload.new } : o)
           )
-          // Queue popup in unified format — green for orders
-          const emoji = newStatus === 'placed' ? '📋' : newStatus === 'preparing' ? '👨‍🍳' : newStatus === 'out_for_delivery' ? '🛵' : newStatus === 'delivered' ? '✅' : '❌'
-          const message = newStatus === 'preparing' ? "We're preparing your order! 👨‍🍳" :
-            newStatus === 'out_for_delivery' ? 'Your order is on the way! 🛵' :
-            newStatus === 'delivered' ? 'Your order has been delivered! Enjoy your meal 😋' : ''
-          setStatusPopups(prev => [...prev, {
-            id: Date.now(),
-            type: 'order',
-            rows: [
-              ['Order ID', `#${payload.new.order_id}`],
-              ['Status', `${emoji} ${label}`],
-              ...(message ? [['', message]] : []),
-            ],
-            summary: label,
-          }])
         }
-        orderStatusRef.current[payload.new.id] = newStatus
-        setOrders(prev => prev.map(o => o.id === payload.new.id ? { ...o, ...payload.new } : o))
-      })
+      )
       .subscribe()
 
     return () => supabase.removeChannel(channel)
   }, [user])
 
   const fetchOrders = async () => {
-    const { data } = await supabase.from('orders').select('*').eq('user_id', user.id).order('created_at', { ascending: false })
-    const rows = data || []
-    setOrders(rows)
+    const { data } = await supabase
+      .from('orders')
+      .select('*')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false })
+    setOrders(data || [])
     setLoading(false)
   }
 
   const submitRating = async ({ rating, comment, showInTestimonial }) => {
     const order = ratingOrder
-    const itemName = order.items?.[0]?.name || 'Item'
     const insertData = {
       user_id: user.id,
       order_id: order.id,
@@ -121,8 +101,7 @@ export default function TrackOrder() {
       show_in_testimonial: showInTestimonial,
       is_hidden: false,
     }
-    console.log('Submitting rating:', insertData)
-    const { data: inserted, error } = await supabase.from('ratings').insert(insertData).select()
+    const { error } = await supabase.from('ratings').insert(insertData).select()
     if (!error) {
       await supabase.from('orders').update({ has_rating: true }).eq('id', order.id)
       setOrders(prev => prev.map(o => o.id === order.id ? { ...o, has_rating: true } : o))
@@ -243,8 +222,6 @@ export default function TrackOrder() {
         )}
       </div>
       {ratingOrder && <RatingModal order={ratingOrder} onClose={() => setRatingOrder(null)} onSubmit={submitRating} />}
-
-
     </div>
   )
 }
