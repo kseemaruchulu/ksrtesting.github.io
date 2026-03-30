@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
-import { requestPushPermission } from '../lib/pushNotifications'
+import { requestPushPermission, registerServiceWorker } from '../lib/pushNotifications'
 
 const AuthContext = createContext({})
 
@@ -11,6 +11,9 @@ export const AuthProvider = ({ children }) => {
   const [isOwner, setIsOwner] = useState(false)
 
   useEffect(() => {
+    // Register service worker for background push notifications
+    registerServiceWorker()
+
     // Restore owner session from localStorage
     if (localStorage.getItem('owner_session') === 'true') setIsOwner(true)
 
