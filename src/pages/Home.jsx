@@ -24,7 +24,7 @@ function SpecialCarousel({ specials }) {
 
   // ── WELCOME SLIDE (always first) ──────────────────────────────
   // Replace the URL below with your restaurant photo URL when ready
-  const RESTAURANT_IMAGE_URL = 'https://lh3.googleusercontent.com/p/AF1QipPJ9ah-B4yGjc-zeOC30PYD9gQmkD8pxdCZKwn9=w400-h225-k-no'
+  const RESTAURANT_IMAGE_URL = 'https://blogger.googleusercontent.com/img/a/AVvXsEi28iA75XzWrEueweI-se3v6b3BUOSm1wbUTP415r_IpBY4yna0ORG03wipMTVpc1pSLCyBu5IysSSjig5K6ltGwbdzaS9Tfu0GgSqvIJrIOPqXwt14VptpL2y0xIOcjVIYsP2DLB0JbD6YrZ4k6TkNozhz0jX4pTvQFpMD7leaW_xE3QTywm600m0OHsI'
   // ─────────────────────────────────────────────────────────────
 
   // Prepend welcome slide to specials
