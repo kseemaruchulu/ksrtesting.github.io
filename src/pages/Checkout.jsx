@@ -7,26 +7,6 @@ import { playNotificationSound } from '../lib/sounds'
 import toast from 'react-hot-toast'
 import { CheckCircle, CreditCard } from 'lucide-react'
 
-async function generateOrderId() {
-  const now = new Date()
-  const d = String(now.getDate()).padStart(2, '0')
-  const m = String(now.getMonth() + 1).padStart(2, '0')
-  const y = String(now.getFullYear()).slice(-2)
-  const prefix = `${d}${m}${y}`
-
-  // Count orders placed today to get the next sequence number
-  const startOfDay = new Date()
-  startOfDay.setHours(0, 0, 0, 0)
-
-  const { count } = await supabase
-    .from('orders')
-    .select('*', { count: 'exact', head: true })
-    .gte('created_at', startOfDay.toISOString())
-
-  const sequence = String((count || 0) + 1).padStart(3, '0')
-  return `${prefix}${sequence}`
-}
-
 export default function Checkout() {
   const { state } = useLocation()
   const navigate = useNavigate()
@@ -37,46 +17,45 @@ export default function Checkout() {
 
   if (!state) { navigate('/cart'); return null }
 
-  const { address, phone, mapsLink, total, subtotal, deliveryCharge, taxAmount, discount, coupon, items } = state
+  const { address, phone, mapsLink, total, subtotal, deliveryCharge, taxAmount, discount, coupon, items, areaName } = state
 
-  const handlePayment = async () => {
-    setProcessing(true)
-    try {
-      // Simulate payment processing (replace with Razorpay/Stripe)
-      await new Promise(r => setTimeout(r, 2000))
+ const handlePayment = async () => {
+  setProcessing(true)
+  try {
+    // Simulate payment processing
+    await new Promise(r => setTimeout(r, 2000))
 
-      const orderId = await generateOrderId()
-      const { error } = await supabase.from('orders').insert({
-        order_id: orderId,
-        user_id: user.id,
-        items: items,
-        subtotal,
-        delivery_charge: deliveryCharge,
-        tax_amount: taxAmount,
-        discount,
-        coupon_code: coupon?.code || null,
-        total,
-        status: 'placed',
-        address,
-        phone,
-        maps_link: mapsLink || null,
-        user_name: profile?.name || user.user_metadata?.full_name || 'Customer',
-        user_email: user.email,
-      })
+    // Call server-side validation function
+    const { data, error } = await supabase.rpc('create_validated_order', {
+      p_user_id: user.id,
+      p_items: items.map(i => ({ id: i.id, name: i.name, qty: i.qty })),
+      p_address: address,
+      p_phone: phone,
+      p_maps_link: mapsLink || null,
+      p_coupon_code: coupon?.code || null,
+      p_area_name: areaName || null
+    })
 
-      if (error) throw error
-
-      dispatch({ type: 'CLEAR' })
-      setPaid(true)
-      playNotificationSound('user')
-      toast.success('Order placed successfully!', { icon: '🎉' })
-
-      setTimeout(() => navigate('/track-order'), 3000)
-    } catch (err) {
-      toast.error('Payment failed. Please try again.')
+    if (error) throw error
+    
+    if (!data.success) {
+      throw new Error(data.error || 'Order creation failed')
     }
-    setProcessing(false)
+
+    // Clear cart
+    dispatch({ type: 'CLEAR' })
+    setPaid(true)
+    playNotificationSound('user')
+    toast.success('Order placed successfully!', { icon: '🎉' })
+
+    setTimeout(() => navigate('/track-order'), 3000)
+  } catch (err) {
+    console.error('Payment error:', err)
+    toast.error(err.message || 'Payment failed. Please try again.')
   }
+  setProcessing(false)
+}
+
 
   if (paid) {
     return (
@@ -115,6 +94,9 @@ export default function Checkout() {
               <span>Total</span><span>₹{total}</span>
             </div>
           </div>
+          <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-xl text-xs text-blue-800">
+            ℹ️ <strong>Note:</strong> Final amount will be validated server-side to ensure accurate pricing.
+          </div>
         </div>
 
         <div className="card p-6 mb-6">
@@ -139,7 +121,7 @@ export default function Checkout() {
             </span>
           ) : `Pay ₹${total}`}
         </button>
-        <p className="text-center text-xs text-gray-400 mt-3">🔒 100% secure payment</p>
+        <p className="text-center text-xs text-gray-400 mt-3">🔒 100% secure payment with server-side validation</p>
       </div>
     </div>
   )
