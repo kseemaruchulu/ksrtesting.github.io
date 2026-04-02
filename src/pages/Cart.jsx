@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Trash2, ShoppingBag, Tag, MapPin, Phone, Lock, ChevronDown, ChevronUp, Check, Navigation } from 'lucide-react'
 import { useCart } from '../context/CartContext'
@@ -7,7 +7,7 @@ import { useRestaurant } from '../context/RestaurantContext'
 import { supabase } from '../lib/supabase'
 import toast from 'react-hot-toast'
 
-/* ─── Coupon Section (unchanged) ─────────────────────────── */
+/* ─── Coupon Section ─────────────────────────── */
 function CouponSection({ subtotal, deliveryCharge, appliedCoupon, onApply, onRemove }) {
   const [coupons, setCoupons] = useState([])
   const [open, setOpen] = useState(false)
@@ -85,7 +85,7 @@ function CouponSection({ subtotal, deliveryCharge, appliedCoupon, onApply, onRem
   )
 }
 
-/* ─── Map Pin Drop Component ──────────────────────────────── */
+/* ─── Map Pin Drop Component (ORIGINAL VERSION WITH MANUAL LINK OPTION) ──────────────────────────────── */
 function MapPinDrop({ onLocationSelect, selectedPin }) {
   const [detecting, setDetecting] = useState(false)
 
@@ -126,7 +126,6 @@ function MapPinDrop({ onLocationSelect, selectedPin }) {
         )}
       </div>
 
-      {/* Auto-detect button */}
       <button
         type="button"
         onClick={detectLocation}
@@ -148,7 +147,7 @@ function MapPinDrop({ onLocationSelect, selectedPin }) {
         </div>
       )}
 
-      {/* Manual Maps link fallback */}
+      {/* ORIGINAL FEATURE: Manual Maps link fallback */}
       <details className="text-xs text-gray-400">
         <summary className="cursor-pointer hover:text-gray-600">Can't use GPS? Paste a Google Maps link instead</summary>
         <div className="mt-2">
@@ -168,69 +167,126 @@ function MapPinDrop({ onLocationSelect, selectedPin }) {
           />
         </div>
       </details>
+
+      <p className="text-xs text-gray-500">
+        💡 <strong>Why GPS?</strong> Your pin lets the delivery person navigate directly to you. We'll also collect your flat/house number and area.
+      </p>
     </div>
   )
 }
 
-/* ─── Main Cart Page ──────────────────────────────────────── */
 export default function Cart() {
   const { items, dispatch, subtotal, itemCount, coupon, discount } = useCart()
   const { user, profile } = useAuth()
   const { settings } = useRestaurant()
   const navigate = useNavigate()
 
-  const [pin, setPin]         = useState(null)   // { lat, lng }
-  const [flatNo, setFlatNo]   = useState('')
-  const [area, setArea]       = useState(null)
-  const [areas, setAreas]     = useState([])
-  const [phone, setPhone]     = useState('')
+  const [phone, setPhone] = useState('')
+  const [flatNo, setFlatNo] = useState('')
+  const [area, setArea] = useState(null)
+  const [areas, setAreas] = useState([])
+  const [pin, setPin] = useState(null)
   const [loading, setLoading] = useState(false)
 
+  // Tax settings
+  const cgst = settings.cgst_percent || 0
+  const sgst = settings.sgst_percent || 0
+  const taxPercent = cgst + sgst || settings.tax_percent || 0
+  const taxAmount = Math.round((subtotal * taxPercent) / 100)
+
+  // Calculate delivery charge based on area
   const baseDeliveryCharge = area ? Number(area.delivery_charge) : (settings.delivery_charge || 40)
   const deliveryCharge = coupon?.discount_type === 'free_delivery' ? 0 : baseDeliveryCharge
-  const cgst       = settings.cgst_percent || 0
-  const sgst       = settings.sgst_percent || 0
-  const taxPercent = cgst + sgst || settings.tax_percent || 0
-  const taxAmount  = Math.round((subtotal * taxPercent) / 100)
-  const total      = subtotal + deliveryCharge + taxAmount - (coupon?.discount_type === 'free_delivery' ? 0 : (discount || 0))
+
+  // Calculate total
+  const total = subtotal + deliveryCharge + taxAmount - (coupon?.discount_type === 'free_delivery' ? 0 : (discount || 0))
 
   // Full address string for storage
   const fullAddress = [flatNo, area?.name, pin ? `GPS:${pin.lat.toFixed(6)},${pin.lng.toFixed(6)}` : ''].filter(Boolean).join(' | ')
-  const mapsLink    = pin ? `https://www.google.com/maps?q=${pin.lat},${pin.lng}` : ''
+  const mapsLink = pin ? `https://www.google.com/maps?q=${pin.lat},${pin.lng}` : ''
 
   useEffect(() => {
+    if (!user) { navigate('/login'); return }
     if (profile) setPhone(profile.phone || '')
     supabase.from('delivery_areas').select('*').eq('is_active', true).order('sort_order')
       .then(({ data }) => setAreas(data || []))
-  }, [profile])
+  }, [user, profile])
 
-  const handleApplyCoupon  = (c, amt) => { dispatch({ type: 'APPLY_COUPON', coupon: c, discount: amt }); toast.success(`Coupon ${c.code} applied!`, { icon: '🏷️' }) }
-  const handleRemoveCoupon = ()       => { dispatch({ type: 'REMOVE_COUPON' }); toast.success('Coupon removed') }
+  // IMPORTANT: Validate phone to exactly 10 digits
+  const validatePhone = (value) => {
+    const cleaned = value.replace(/\D/g, '')
+    return cleaned.slice(0, 10)
+  }
+
+  const handlePhoneChange = (e) => {
+    const validated = validatePhone(e.target.value)
+    setPhone(validated)
+  }
+
+  const handleApplyCoupon = (c, amt) => {
+    dispatch({ type: 'APPLY_COUPON', coupon: c, discount: amt })
+    toast.success(`Coupon ${c.code} applied!`, { icon: '🏷️' })
+  }
+
+  const handleRemoveCoupon = () => {
+    dispatch({ type: 'REMOVE_COUPON' })
+    toast.success('Coupon removed')
+  }
 
   const handleProceed = async () => {
-    if (!user)              { toast.error('Please login first'); navigate('/login'); return }
-    if (!settings.is_open)  { toast.error('Restaurant is currently closed'); return }
+    if (!user) { toast.error('Please login first'); navigate('/login'); return }
+    if (!settings.is_open) { toast.error('Restaurant is currently closed'); return }
     if (items.length === 0) { toast.error('Your cart is empty'); return }
-    if (!pin)               { toast.error('Please drop your location pin first'); return }
-    if (!flatNo.trim())     { toast.error('Please enter your flat / house number'); return }
-    if (!area)              { toast.error('Please select your delivery area'); return }
-    if (!phone.trim())      { toast.error('Please enter your phone number'); return }
+    
+    // Validate phone is exactly 10 digits
+    if (phone.length !== 10) {
+      toast.error('Please enter a valid 10-digit phone number')
+      return
+    }
+    
+    if (!pin) { toast.error('Please drop your location pin first'); return }
+    if (!flatNo.trim()) { toast.error('Please enter your flat / house number'); return }
+    if (!area) { toast.error('Please select your delivery area'); return }
+
     setLoading(true)
+    
+    // Save phone to profile
     await supabase.from('profiles').update({ phone: phone.trim() }).eq('id', user.id)
+    
     navigate('/checkout', {
-      state: { address: fullAddress, phone, mapsLink, total, subtotal, deliveryCharge, taxAmount, discount, coupon, items, cgst, sgst, taxPercent, areaName: area?.name }
+      state: {
+        address: fullAddress,
+        phone,
+        mapsLink,
+        total,
+        subtotal,
+        deliveryCharge,
+        taxAmount,
+        discount,
+        coupon,
+        items,
+        cgst,
+        sgst,
+        taxPercent,
+        areaName: area?.name
+      }
     })
+    
     setLoading(false)
   }
 
+  if (!user) return null
+
   if (items.length === 0) {
     return (
-      <div className="pt-20 min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <div className="text-6xl mb-4">🛒</div>
-          <h2 className="font-display text-2xl font-bold text-gray-800 mb-2">Your cart is empty</h2>
-          <p className="text-gray-500 mb-6">Add some delicious items to get started</p>
-          <Link to="/menu" className="btn-primary">Browse Menu</Link>
+      <div className="pt-20 min-h-screen bg-cream-50 flex items-center justify-center">
+        <div className="text-center px-4">
+          <ShoppingBag size={64} className="mx-auto text-gray-300 mb-4" />
+          <h2 className="font-display text-2xl font-bold text-gray-900 mb-2">Your cart is empty</h2>
+          <p className="text-gray-500 mb-6">Add items from the menu to get started</p>
+          <Link to="/menu" className="btn-primary inline-flex items-center gap-2">
+            Browse Menu
+          </Link>
         </div>
       </div>
     )
@@ -281,12 +337,27 @@ export default function Cart() {
                 <MapPin size={20} className="text-primary-600" /> Delivery Details
               </h2>
 
-              {/* Phone */}
+              {/* Phone - Exactly 10 digits */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1.5 flex items-center gap-1">
-                  <Phone size={13} /> Phone Number *
+                  <Phone size={13} /> Phone Number * (10 digits only)
                 </label>
-                <input value={phone} onChange={e => setPhone(e.target.value)} className="input" placeholder="98765 43210" maxLength={10} />
+                <input 
+                  value={phone} 
+                  onChange={handlePhoneChange}
+                  className="input" 
+                  placeholder="9876543210" 
+                  type="tel"
+                  maxLength={10}
+                />
+                {phone.length > 0 && phone.length !== 10 && (
+                  <p className="text-xs text-red-600 mt-1">
+                    {phone.length < 10 ? `Enter ${10 - phone.length} more digit${10 - phone.length > 1 ? 's' : ''}` : 'Maximum 10 digits'}
+                  </p>
+                )}
+                {phone.length === 10 && (
+                  <p className="text-xs text-green-600 mt-1">✓ Valid phone number</p>
+                )}
               </div>
 
               {/* Flat / House No */}
@@ -295,10 +366,10 @@ export default function Cart() {
                 <input value={flatNo} onChange={e => setFlatNo(e.target.value)} className="input" placeholder="e.g. 4B, Sunrise Apartments" />
               </div>
 
-              {/* Area dropdown */}
+              {/* Area dropdown - NO delivery charge shown */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-1">
-                  <MapPin size={13} /> Delivery Area * <span className="text-gray-400 font-normal text-xs">(sets delivery charge)</span>
+                  <MapPin size={13} /> Delivery Area *
                 </label>
                 {areas.length === 0 ? (
                   <div className="input bg-gray-50 text-gray-400 text-sm">No delivery areas configured yet</div>
@@ -309,16 +380,19 @@ export default function Cart() {
                         className={`flex items-center justify-between px-4 py-3 rounded-xl border-2 text-left transition-all
                           ${area?.id === a.id ? 'border-primary-500 bg-primary-50' : 'border-gray-200 hover:border-primary-300 bg-white'}`}>
                         <span className="font-medium text-gray-800 text-sm">{a.name}</span>
-                        <span className={`text-sm font-semibold ${area?.id === a.id ? 'text-primary-600' : 'text-gray-500'}`}>
-                          {Number(a.delivery_charge) === 0 ? 'Free' : `₹${a.delivery_charge}`}
-                        </span>
+                        {area?.id === a.id && (
+                          <Check size={16} className="text-primary-600" />
+                        )}
                       </button>
                     ))}
                   </div>
                 )}
+                <p className="text-xs text-gray-500 mt-2">
+                  💡 Delivery charge will be shown on the next page
+                </p>
               </div>
 
-              {/* GPS Pin Drop */}
+              {/* GPS Pin Drop with original manual link option */}
               <MapPinDrop onLocationSelect={setPin} selectedPin={pin} />
 
               {/* Summary of what delivery person sees */}
@@ -343,35 +417,63 @@ export default function Cart() {
             </div>
           </div>
 
-          {/* Order Summary */}
+          {/* Order Summary - NO delivery charge shown */}
           <div className="lg:col-span-1">
             <div className="card p-6 sticky top-24">
               <h2 className="font-display text-xl font-semibold mb-5">Order Summary</h2>
               <div className="space-y-3 text-sm">
-                <div className="flex justify-between text-gray-600"><span>Subtotal ({itemCount} items)</span><span>₹{subtotal}</span></div>
-                {cgst > 0 && <div className="flex justify-between text-gray-600"><span>CGST ({cgst}%)</span><span>₹{Math.round(subtotal * cgst / 100)}</span></div>}
-                {sgst > 0 && <div className="flex justify-between text-gray-600"><span>SGST ({sgst}%)</span><span>₹{Math.round(subtotal * sgst / 100)}</span></div>}
-                {!cgst && !sgst && taxPercent > 0 && <div className="flex justify-between text-gray-600"><span>Tax ({taxPercent}%)</span><span>₹{taxAmount}</span></div>}
+                <div className="flex justify-between text-gray-600">
+                  <span>Subtotal ({itemCount} items)</span>
+                  <span>₹{subtotal}</span>
+                </div>
+                
+                {cgst > 0 && (
+                  <div className="flex justify-between text-gray-600">
+                    <span>CGST ({cgst}%)</span>
+                    <span>₹{Math.round(subtotal * cgst / 100)}</span>
+                  </div>
+                )}
+                
+                {sgst > 0 && (
+                  <div className="flex justify-between text-gray-600">
+                    <span>SGST ({sgst}%)</span>
+                    <span>₹{Math.round(subtotal * sgst / 100)}</span>
+                  </div>
+                )}
+                
+                {!cgst && !sgst && taxPercent > 0 && (
+                  <div className="flex justify-between text-gray-600">
+                    <span>Tax ({taxPercent}%)</span>
+                    <span>₹{taxAmount}</span>
+                  </div>
+                )}
+                
+                {/* Delivery charge hidden */}
                 <div className="flex justify-between text-gray-600">
                   <span>Delivery</span>
-                  {coupon?.discount_type === 'free_delivery'
-                    ? <span className="text-green-600 font-medium">FREE</span>
-                    : <span>₹{deliveryCharge}</span>}
+                  <span className="text-gray-400 text-xs">See next page</span>
                 </div>
+                
                 {discount > 0 && coupon?.discount_type !== 'free_delivery' && (
-                  <div className="flex justify-between text-green-600"><span>Coupon ({coupon?.code})</span><span>−₹{discount}</span></div>
+                  <div className="flex justify-between text-green-600">
+                    <span>Coupon ({coupon?.code})</span>
+                    <span>−₹{discount}</span>
+                  </div>
                 )}
-                <div className="border-t border-gray-100 pt-3 flex justify-between font-bold text-lg text-gray-900">
-                  <span>Total</span><span>₹{total}</span>
+                
+                <div className="border-t border-gray-100 pt-3 text-gray-600">
+                  <p className="text-xs mb-2">Final total will be shown after selecting delivery area</p>
                 </div>
               </div>
+              
               <button
                 onClick={handleProceed}
                 disabled={loading || !settings.is_open}
                 className="btn-primary w-full mt-6 text-lg py-4 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {loading ? 'Processing...' : `Proceed to Payment — ₹${total}`}
+                {loading ? 'Processing...' : 'Continue to Checkout →'}
               </button>
+              
               <p className="text-center text-xs text-gray-400 mt-3">🔒 Secure checkout</p>
             </div>
           </div>
