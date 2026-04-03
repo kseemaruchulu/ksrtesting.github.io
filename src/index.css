@@ -171,3 +171,12 @@
   0%   { transform: translateX(0); }
   100% { transform: translateX(-50%); }
 }
+
+/* ── Bounce-in animation (order status bubble) ── */
+@keyframes bounce-in {
+  0%   { transform: scale(0) rotate(-12deg); opacity: 0; }
+  55%  { transform: scale(1.18) rotate(4deg); opacity: 1; }
+  75%  { transform: scale(0.94) rotate(-2deg); }
+  100% { transform: scale(1) rotate(0deg); opacity: 1; }
+}
+.animate-bounce-in { animation: bounce-in 0.38s cubic-bezier(0.34, 1.56, 0.64, 1) both; }
