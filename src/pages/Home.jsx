@@ -69,118 +69,17 @@ function SpecialCarousel({ specials }) {
   }
 
   const slide = allSlides[current]
+  const animClass = direction === 'right' ? 'carousel-enter-right' : 'carousel-enter-left'
 
-  // ── WELCOME SLIDE RENDER ──
-  const WelcomeSlide = () => (
-    <div
-      key={animKey}
-      className={`flex-1 min-w-0 overflow-hidden rounded-3xl shadow-lg border border-gray-100
-        flex flex-col lg:flex-row bg-white
-        ${direction === 'right' ? 'carousel-enter-right' : 'carousel-enter-left'}`}
-    >
-      {/* Image */}
-      <div className="relative w-full lg:w-[55%] shrink-0" style={{ aspectRatio: '16/9' }}>
-        {RESTAURANT_IMAGE_URL !== 'YOUR_RESTAURANT_IMAGE_URL_HERE'
-          ? <img src={RESTAURANT_IMAGE_URL} alt={settings.name} className="w-full h-full object-cover" />
-          : <div className="w-full h-full bg-gradient-to-br from-primary-100 via-orange-50 to-cream-100 flex flex-col items-center justify-center gap-3">
-              <span className="text-7xl">🏪</span>
-              <span className="text-gray-400 text-sm font-medium">Restaurant photo coming soon</span>
-            </div>
-        }
-      </div>
-
-      {/* Welcome text */}
-      <div className="flex-1 flex flex-col items-center justify-center p-6 sm:p-8 lg:p-10 text-center bg-gradient-to-br from-cream-50 to-orange-50">
-        <div className="inline-flex items-center gap-2 bg-primary-100 text-primary-700 text-xs font-bold px-4 py-1.5 rounded-full mb-4 shadow-sm">
-          <span>✨</span> Welcome
-        </div>
-        <h1 className="font-display text-3xl sm:text-4xl lg:text-5xl font-bold text-gray-900 leading-tight mb-3">
-          {settings.name || 'Our Restaurant'}
-        </h1>
-        <p className="text-gray-500 text-sm sm:text-base leading-relaxed mb-6 max-w-xs">
-          Handcrafted dishes made with love, fresh ingredients, and a pinch of tradition.
-        </p>
-        <Link to="/menu" className="btn-primary flex items-center gap-2 text-sm">
-          View Full Menu <ArrowRight size={15} />
-        </Link>
-      </div>
-    </div>
-  )
-
-  // ── SPECIAL ITEM SLIDE RENDER ──
-  const SpecialSlide = ({ s }) => {
-    const item = s?.menu_items
-    if (!item) return null
-    const disc = s.original_price && s.special_price
-      ? Math.round((1 - s.special_price / s.original_price) * 100) : 0
-    const handleOrder = () => {
-      if (!settings.is_open) { toast.error('Restaurant is currently closed'); return }
-      dispatch({ type: 'ADD', item: { ...item, price: s.special_price } })
-      toast.success(`${item.name} added to cart!`, { icon: '🛒' })
-    }
-    return (
-      <div
-        key={animKey}
-        className={`flex-1 min-w-0 overflow-hidden rounded-3xl shadow-lg border border-gray-100
-          flex flex-col lg:flex-row bg-white
-          ${direction === 'right' ? 'carousel-enter-right' : 'carousel-enter-left'}`}
-      >
-        {/* Image */}
-        <div className="relative w-full lg:w-[55%] shrink-0" style={{ aspectRatio: '16/9' }}>
-          {item.image_url
-            ? <img src={item.image_url} alt={item.name} className="w-full h-full object-cover" />
-            : <div className="w-full h-full bg-gradient-to-br from-primary-100 to-orange-100 flex items-center justify-center text-8xl">🍽</div>
-          }
-          <div className="absolute top-3 left-3">
-            {item.is_veg
-              ? <span className="badge-veg shadow-sm"><span className="w-2 h-2 rounded-full bg-green-500 inline-block" /> Veg</span>
-              : <span className="badge-nonveg shadow-sm"><span className="w-2 h-2 rounded-full bg-red-500 inline-block" /> Non-Veg</span>
-            }
-          </div>
-          {disc > 0 && (
-            <div className="absolute top-3 right-3 bg-green-500 text-white text-xs font-bold px-2.5 py-1 rounded-xl shadow">
-              {disc}% OFF
-            </div>
-          )}
-        </div>
-
-        {/* Details */}
-        <div className="flex-1 flex flex-col justify-between p-5 sm:p-6 lg:p-8 bg-white">
-          <div>
-            {/* Chef special label */}
-            <div className="inline-flex items-center gap-1.5 bg-primary-100 text-primary-700 text-xs font-bold px-3 py-1 rounded-full mb-3">
-              <Flame size={11} /> Chef's Special
-            </div>
-            {item.avg_rating > 0 && (
-              <div className="flex items-center gap-1 mb-3">
-                {[1,2,3,4,5].map(star => (
-                  <Star key={star} size={14}
-                    className={star <= Math.round(item.avg_rating) ? 'fill-yellow-400 text-yellow-400' : 'fill-gray-200 text-gray-200'} />
-                ))}
-                <span className="text-sm text-gray-500 ml-1">{Number(item.avg_rating).toFixed(1)}</span>
-              </div>
-            )}
-            <h2 className="font-display text-2xl sm:text-3xl font-bold text-gray-900 leading-tight mb-2">{item.name}</h2>
-            {item.description && (
-              <p className="text-gray-500 text-sm leading-relaxed line-clamp-3 mb-4">{item.description}</p>
-            )}
-          </div>
-          <div>
-            <div className="flex items-center flex-wrap gap-2 mb-4">
-              <span className="text-3xl font-display font-bold text-primary-600">₹{s.special_price}</span>
-              {s.original_price > 0 && <span className="text-base text-gray-400 line-through">₹{s.original_price}</span>}
-              {disc > 0 && <span className="bg-green-100 text-green-700 text-xs font-bold px-2.5 py-1 rounded-full">{disc}% OFF</span>}
-            </div>
-            <div className="flex gap-3 flex-wrap">
-              <button onClick={handleOrder} className="btn-primary flex items-center gap-2 text-sm">
-                Order Now <ArrowRight size={15} />
-              </button>
-              <Link to="/menu" className="btn-secondary text-sm">View Menu</Link>
-            </div>
-          </div>
-        </div>
-      </div>
-    )
+  // ── Compute special slide data outside JSX to keep JSX clean ──
+  const s = !slide._isWelcome ? slide : null
+  const item = s?.menu_items ?? null
+  const disc = s && s.original_price && s.special_price
+    ? Math.round((1 - s.special_price / s.original_price) * 100) : 0
+  const handleOrder = () => {
+    if (!settings.is_open) { toast.error('Restaurant is currently closed'); return }
+    dispatch({ type: 'ADD', item: { ...item, price: s.special_price } })
+    toast.success(`${item.name} added to cart!`, { icon: '🛒' })
   }
 
   return (
@@ -202,8 +101,104 @@ function SpecialCarousel({ specials }) {
           <ChevronLeft size={22} />
         </button>
 
-        {/* SLIDE */}
-        {slide._isWelcome ? <WelcomeSlide /> : <SpecialSlide s={slide} />}
+        {/* ── SLIDE — rendered as plain JSX (no sub-component) to prevent remount glitch ── */}
+        {slide._isWelcome ? (
+          // WELCOME SLIDE
+          <div
+            key={animKey}
+            className={`flex-1 min-w-0 overflow-hidden rounded-3xl shadow-lg border border-gray-100
+              flex flex-col lg:flex-row bg-white ${animClass}`}
+          >
+            {/* Image */}
+            <div className="relative w-full lg:w-[55%] shrink-0" style={{ aspectRatio: '16/9' }}>
+              {RESTAURANT_IMAGE_URL !== 'YOUR_RESTAURANT_IMAGE_URL_HERE'
+                ? <img src={RESTAURANT_IMAGE_URL} alt={settings.name} className="w-full h-full object-cover" />
+                : <div className="w-full h-full bg-gradient-to-br from-primary-100 via-orange-50 to-cream-100 flex flex-col items-center justify-center gap-3">
+                    <span className="text-7xl">🏪</span>
+                    <span className="text-gray-400 text-sm font-medium">Restaurant photo coming soon</span>
+                  </div>
+              }
+            </div>
+
+            {/* Welcome text */}
+            <div className="flex-1 flex flex-col items-center justify-center p-6 sm:p-8 lg:p-10 text-center bg-gradient-to-br from-cream-50 to-orange-50">
+              <div className="inline-flex items-center gap-2 bg-primary-100 text-primary-700 text-xs font-bold px-4 py-1.5 rounded-full mb-4 shadow-sm">
+                <span>✨</span> Welcome
+              </div>
+              <h1 className="font-display text-3xl sm:text-4xl lg:text-5xl font-bold text-gray-900 leading-tight mb-3">
+                {settings.name || 'Our Restaurant'}
+              </h1>
+              <p className="text-gray-500 text-sm sm:text-base leading-relaxed mb-6 max-w-xs">
+                Handcrafted dishes made with love, fresh ingredients, and a pinch of tradition.
+              </p>
+              <Link to="/menu" className="btn-primary flex items-center gap-2 text-sm">
+                View Full Menu <ArrowRight size={15} />
+              </Link>
+            </div>
+          </div>
+        ) : item ? (
+          // SPECIAL ITEM SLIDE
+          <div
+            key={animKey}
+            className={`flex-1 min-w-0 overflow-hidden rounded-3xl shadow-lg border border-gray-100
+              flex flex-col lg:flex-row bg-white ${animClass}`}
+          >
+            {/* Image */}
+            <div className="relative w-full lg:w-[55%] shrink-0" style={{ aspectRatio: '16/9' }}>
+              {item.image_url
+                ? <img src={item.image_url} alt={item.name} className="w-full h-full object-cover" />
+                : <div className="w-full h-full bg-gradient-to-br from-primary-100 to-orange-100 flex items-center justify-center text-8xl">🍽</div>
+              }
+              <div className="absolute top-3 left-3">
+                {item.is_veg
+                  ? <span className="badge-veg shadow-sm"><span className="w-2 h-2 rounded-full bg-green-500 inline-block" /> Veg</span>
+                  : <span className="badge-nonveg shadow-sm"><span className="w-2 h-2 rounded-full bg-red-500 inline-block" /> Non-Veg</span>
+                }
+              </div>
+              {disc > 0 && (
+                <div className="absolute top-3 right-3 bg-green-500 text-white text-xs font-bold px-2.5 py-1 rounded-xl shadow">
+                  {disc}% OFF
+                </div>
+              )}
+            </div>
+
+            {/* Details */}
+            <div className="flex-1 flex flex-col justify-between p-5 sm:p-6 lg:p-8 bg-white">
+              <div>
+                {/* Chef special label */}
+                <div className="inline-flex items-center gap-1.5 bg-primary-100 text-primary-700 text-xs font-bold px-3 py-1 rounded-full mb-3">
+                  <Flame size={11} /> Chef's Special
+                </div>
+                {item.avg_rating > 0 && (
+                  <div className="flex items-center gap-1 mb-3">
+                    {[1,2,3,4,5].map(star => (
+                      <Star key={star} size={14}
+                        className={star <= Math.round(item.avg_rating) ? 'fill-yellow-400 text-yellow-400' : 'fill-gray-200 text-gray-200'} />
+                    ))}
+                    <span className="text-sm text-gray-500 ml-1">{Number(item.avg_rating).toFixed(1)}</span>
+                  </div>
+                )}
+                <h2 className="font-display text-2xl sm:text-3xl font-bold text-gray-900 leading-tight mb-2">{item.name}</h2>
+                {item.description && (
+                  <p className="text-gray-500 text-sm leading-relaxed line-clamp-3 mb-4">{item.description}</p>
+                )}
+              </div>
+              <div>
+                <div className="flex items-center flex-wrap gap-2 mb-4">
+                  <span className="text-3xl font-display font-bold text-primary-600">₹{s.special_price}</span>
+                  {s.original_price > 0 && <span className="text-base text-gray-400 line-through">₹{s.original_price}</span>}
+                  {disc > 0 && <span className="bg-green-100 text-green-700 text-xs font-bold px-2.5 py-1 rounded-full">{disc}% OFF</span>}
+                </div>
+                <div className="flex gap-3 flex-wrap">
+                  <button onClick={handleOrder} className="btn-primary flex items-center gap-2 text-sm">
+                    Order Now <ArrowRight size={15} />
+                  </button>
+                  <Link to="/menu" className="btn-secondary text-sm">View Menu</Link>
+                </div>
+              </div>
+            </div>
+          </div>
+        ) : null}
 
         {/* RIGHT ARROW */}
         <button
