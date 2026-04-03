@@ -1,4 +1,5 @@
-import { BrowserRouter, Routes, Route } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom'
+import { useEffect } from 'react'
 import { Toaster } from 'react-hot-toast'
 import { AuthProvider } from './context/AuthContext'
 import { CartProvider } from './context/CartContext'
@@ -23,6 +24,15 @@ import TableBooking from './pages/TableBooking'
 import FloatingButtons from './components/ui/FloatingButtons'
 import AnnouncementBar from './components/layout/AnnouncementBar'
 
+// ── Scroll to top on every route change ──────────────────────────────────────
+function ScrollToTop() {
+  const { pathname } = useLocation()
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'instant' })
+  }, [pathname])
+  return null
+}
+
 function Layout({ children }) {
   return (
     <div className="min-h-screen bg-cream-50 flex flex-col">
@@ -46,6 +56,8 @@ export default function App() {
               {/* GlobalNotificationRenderer shows popups on EVERY page */}
               <GlobalNotificationRenderer />
               <Toaster position="top-center" toastOptions={{ style: { fontFamily: "'DM Sans', sans-serif" } }} />
+              {/* ScrollToTop must be inside BrowserRouter to use useLocation */}
+              <ScrollToTop />
               <Routes>
                 <Route path="/" element={<Layout><Home /></Layout>} />
                 <Route path="/menu" element={<Layout><Menu /></Layout>} />
