@@ -5,6 +5,7 @@ const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
+    // PKCE flow works correctly with BrowserRouter + Vite dev server
     flowType: 'pkce',
     autoRefreshToken: true,
     persistSession: true,
@@ -12,7 +13,9 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   },
   realtime: {
     params: { eventsPerSecond: 10 },
-    // Force WebSocket — fixes Realtime silently failing on Vercel
+    // Force WebSocket transport — fixes Realtime on Vercel (Vercel's
+    // edge network can drop long-poll / SSE connections, causing
+    // subscriptions to silently fail in production)
     transport: WebSocket,
   },
 })
